@@ -2,39 +2,42 @@
 # Stage: Builder
 # ========================================================
 FROM golang:1.25-alpine AS builder
+
 WORKDIR /app
-ARG TARGETARCH
 
 RUN apk --no-cache --update add \
   build-base \
-  gcc \
-  wget \
-  unzip
+  gcc
 
 COPY . .
 
 ENV CGO_ENABLED=1
 ENV CGO_CFLAGS="-D_LARGEFILE64_SOURCE"
 RUN go build -ldflags "-w -s" -o build/x-ui main.go
-RUN ./DockerInit.sh "$TARGETARCH"
 
 # ========================================================
 # Stage: Final Image of 3x-ui
 # ========================================================
 FROM alpine
-ENV TZ=Asia/Tehran
+
 WORKDIR /app
+ARG GEOUPDATE_CRON_SCHEDULE
+ARG TARGETARCH
+ARG XRAY_VERSION
 
 RUN apk add --no-cache --update \
   ca-certificates \
   tzdata \
   fail2ban \
-  bash
+  wget \
+  bash \
+  unzip
+
 
 COPY --from=builder /app/build/ /app/
 COPY --from=builder /app/DockerEntrypoint.sh /app/
 COPY --from=builder /app/x-ui.sh /usr/bin/x-ui
-
+COPY DockerInit.sh .
 
 # Configure fail2ban
 RUN rm -f /etc/fail2ban/jail.d/alpine-ssh.conf \
@@ -45,10 +48,18 @@ RUN rm -f /etc/fail2ban/jail.d/alpine-ssh.conf \
 
 RUN chmod +x \
   /app/DockerEntrypoint.sh \
+  /app/DockerInit.sh \
   /app/x-ui \
   /usr/bin/x-ui
 
-ENV XUI_ENABLE_FAIL2BAN="true"
+
+RUN ./DockerInit.sh update_xray_core "$TARGETARCH" "/app/bin" "$XRAY_VERSION"
+RUN ./DockerInit.sh update_geodata "/app/bin"
+RUN touch /tmp/cron_test.log
+
+# Geodata update schedule
+RUN echo "${GEOUPDATE_CRON_SCHEDULE} /app/DockerInit.sh update_geodata /app/bin" > /etc/crontabs/root
+
 EXPOSE 2053
 VOLUME [ "/etc/x-ui" ]
 CMD [ "./x-ui" ]
