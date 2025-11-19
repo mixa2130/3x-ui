@@ -9,11 +9,33 @@ RUN apk --no-cache --update add \
   build-base \
   gcc
 
+COPY go.mod go.sum ./
+RUN go mod download
+
 COPY . .
 
 ENV CGO_ENABLED=1
 ENV CGO_CFLAGS="-D_LARGEFILE64_SOURCE"
 RUN go build -ldflags "-w -s" -o build/x-ui main.go
+
+#RUN --mount=type=cache,target=/go/pkg/mod \
+#    --mount=type=cache,target=/root/.cache/go-build \
+#    go build -ldflags "-w -s" -o build/x-ui main.go
+
+# ========================================================
+# Stage: Xray downloader
+# ========================================================
+FROM alpine AS xray-downloader
+
+ARG TARGETARCH
+ARG XRAY_VERSION
+
+WORKDIR /app
+RUN apk add --no-cache wget unzip
+
+COPY DockerInit.sh .
+RUN chmod +x /app/DockerInit.sh
+RUN ./DockerInit.sh update_xray_core "$TARGETARCH" "/app/bin" "$XRAY_VERSION"
 
 # ========================================================
 # Stage: Final Image of 3x-ui
@@ -21,22 +43,20 @@ RUN go build -ldflags "-w -s" -o build/x-ui main.go
 FROM alpine
 
 WORKDIR /app
+
 ARG GEOUPDATE_CRON_SCHEDULE
-ARG TARGETARCH
-ARG XRAY_VERSION
 
 RUN apk add --no-cache --update \
   ca-certificates \
   tzdata \
   fail2ban \
   wget \
-  bash \
-  unzip
-
+  bash
 
 COPY --from=builder /app/build/ /app/
 COPY --from=builder /app/DockerEntrypoint.sh /app/
 COPY --from=builder /app/x-ui.sh /usr/bin/x-ui
+COPY --from=xray-downloader /app/bin /app/bin
 COPY DockerInit.sh .
 
 # Configure fail2ban
@@ -51,16 +71,16 @@ RUN chmod +x \
   /app/DockerInit.sh \
   /app/x-ui \
   /usr/bin/x-ui
+#  && ./DockerInit.sh update_geodata "/app/bin"
 
 
-RUN ./DockerInit.sh update_xray_core "$TARGETARCH" "/app/bin" "$XRAY_VERSION"
-RUN ./DockerInit.sh update_geodata "/app/bin"
-RUN touch /tmp/cron_test.log
+#RUN ./DockerInit.sh update_xray_core "$TARGETARCH" "/app/bin" "$XRAY_VERSION"
+#RUN ./DockerInit.sh update_geodata "/app/bin"
 
 # Geodata update schedule
 RUN echo "${GEOUPDATE_CRON_SCHEDULE} /app/DockerInit.sh update_geodata /app/bin" > /etc/crontabs/root
 
 EXPOSE 2053
 VOLUME [ "/etc/x-ui" ]
-CMD [ "./x-ui" ]
+#CMD [ "./x-ui" ]
 ENTRYPOINT [ "/app/DockerEntrypoint.sh" ]

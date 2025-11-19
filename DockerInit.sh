@@ -47,6 +47,8 @@ update_xray_core() {
     cp ./xray-unzip/xray ./"xray-linux-${FNAME}"
     rm -r xray-unzip
     rm "Xray-linux-${ARCH}.zip"
+
+    echo "[$(date)] Finished update_xray_core"
 }
 
 update_geodata() {
@@ -62,11 +64,19 @@ update_geodata() {
     cd "$WORKDIR"
 
     wget -q -O geoip.dat https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geoip.dat
+    echo "[$(date)] geoip.dat downloaded"
     wget -q -O geosite.dat https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geosite.dat
+    echo "[$(date)] geosite.dat downloaded"
     wget -q -O geoip_IR.dat https://github.com/chocolate4u/Iran-v2ray-rules/releases/latest/download/geoip.dat
+    echo "[$(date)] IR geoip.dat downloaded"
     wget -q -O geosite_IR.dat https://github.com/chocolate4u/Iran-v2ray-rules/releases/latest/download/geosite.dat
+    echo "[$(date)] IR geosite.dat downloaded"
     wget -q -O geoip_RU.dat https://github.com/runetfreedom/russia-v2ray-rules-dat/releases/latest/download/geoip.dat
+    echo "[$(date)] RU geoip.dat downloaded"
     wget -q -O geosite_RU.dat https://github.com/runetfreedom/russia-v2ray-rules-dat/releases/latest/download/geosite.dat
+    echo "[$(date)] RU geosite.dat downloaded"
+
+    echo "[$(date)] Finished update_geodata"
 }
 
 
